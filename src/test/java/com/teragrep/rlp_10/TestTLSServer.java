@@ -80,7 +80,6 @@ public class TestTLSServer {
     private static final Logger LOGGER = LoggerFactory.getLogger(TestTLSServer.class);
 
     private EventLoop eventLoop;
-    private Thread eventLoopThread;
 
     private ExecutorService executorService;
 
@@ -93,9 +92,10 @@ public class TestTLSServer {
         final EventLoopFactory eventLoopFactory = new EventLoopFactory();
         Assertions.assertDoesNotThrow(() -> eventLoop = eventLoopFactory.create());
 
-        eventLoopThread = new Thread(eventLoop);
-        eventLoopThread.start();
-        executorService = Executors.newSingleThreadExecutor();
+        executorService = Executors.newVirtualThreadPerTaskExecutor();
+
+        executorService.submit(eventLoop);
+
         final TransportConfig transportConfiguration = new TransportConfig(
                 true,
                 Path.of("src/test/resources/tls/keystore-server.jks"),
@@ -143,7 +143,6 @@ public class TestTLSServer {
     public void cleanup() {
         eventLoop.stop();
         executorService.shutdown();
-        Assertions.assertDoesNotThrow(() -> eventLoopThread.join());
     }
 
     @AfterEach

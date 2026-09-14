@@ -172,10 +172,13 @@ class Initiator implements Runnable {
 
     private boolean connect(final RelpClient relpClient) throws InterruptedException, ExecutionException {
         final boolean connected;
+        System.out.println("sending open");
         final CompletableFuture<RelpFrame> open = relpClient
                 .transmit(relpFrameFactory.create("open", "a hallo yo client"));
         try {
+            System.out.println("waiting open");
             open.get(openTimeout, TimeUnit.SECONDS);
+            System.out.println("open complete");
             connected = true;
         }
         catch (final TimeoutException timeoutException) {
