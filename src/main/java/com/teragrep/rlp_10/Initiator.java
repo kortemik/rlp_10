@@ -60,7 +60,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
 
 class Initiator implements Runnable {
 
@@ -151,6 +150,7 @@ class Initiator implements Runnable {
         catch (final ExecutionException | InterruptedException exception) {
             throw new RuntimeException("Initiator encountered an unrecoverable error: ", exception);
         }
+
     }
 
     private void connect(final RelpClient relpClient, final int retryCount)
@@ -164,8 +164,8 @@ class Initiator implements Runnable {
             metrics.retriedConnects().inc();
             connected = connect(relpClient);
         }
-        if(!connected){
-            throw new TransmissionException("Failed to connect to server in "+retryCount+" attempts!");
+        if (!connected) {
+            throw new TransmissionException("Failed to connect to server in " + retryCount + " attempts!");
         }
         connectTimer.close();
     }
@@ -177,11 +177,12 @@ class Initiator implements Runnable {
                 .transmit(relpFrameFactory.create("open", "a hallo yo client"));
         try {
             System.out.println("waiting open");
-            open.get(openTimeout, TimeUnit.SECONDS);
+            open.get(Long.MAX_VALUE, TimeUnit.SECONDS);
             System.out.println("open complete");
             connected = true;
         }
         catch (final TimeoutException timeoutException) {
+            System.out.println("open timeout");
             open.cancel(false);
             return false;
         }
@@ -191,14 +192,17 @@ class Initiator implements Runnable {
     private void send(final RelpClient relpClient, final int retryCount)
             throws InterruptedException, ExecutionException, TransmissionException {
         int retries = 0;
+        System.out.println("sending");
         boolean sent = send(relpClient);
         while (!sent && retries < retryCount) {
+            System.out.println("re sending");
             retries++;
             metrics.resends().inc();
             sent = send(relpClient);
+            System.out.println("sent");
         }
-        if(!sent){
-            throw new TransmissionException("Failed to connect to server in "+retryCount+" attempts!");
+        if (!sent) {
+            throw new TransmissionException("Failed to connect to server in " + retryCount + " attempts!");
         }
     }
 

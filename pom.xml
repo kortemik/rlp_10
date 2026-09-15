@@ -26,6 +26,12 @@
     <slf4j.version>2.0.5</slf4j.version>
   </properties>
   <dependencies>
+    <!-- enforce local net_01 version -->
+    <dependency>
+      <groupId>com.teragrep</groupId>
+      <artifactId>net_01</artifactId>
+      <version>0.0.1-SNAPSHOT</version>
+    </dependency>
     <!-- Syslog message -->
     <dependency>
       <groupId>com.teragrep</groupId>

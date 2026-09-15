@@ -145,8 +145,8 @@ public class Benchmark {
                 prometheusConfig
         );
         final Slf4JMetricsReport slf4JMetricsReport = new Slf4JMetricsReport(metrics.registry(), reportConfig);
-        reports.add(prometheusMetricsReport);
-        reports.add(slf4JMetricsReport);
+        //reports.add(prometheusMetricsReport);
+        //reports.add(slf4JMetricsReport);
 
         for (final MetricsReport report : reports) {
             report.start();
@@ -156,7 +156,9 @@ public class Benchmark {
         final EventLoopFactory eventLoopFactory = new EventLoopFactory();
         try {
             final EventLoop eventLoop = eventLoopFactory.create();
-            executorService.submit(eventLoop);
+            //executorService.submit(eventLoop);
+            Thread evT = new Thread(eventLoop, "evT");
+            evT.start();
 
             final SocketFactory socketFactory;
 

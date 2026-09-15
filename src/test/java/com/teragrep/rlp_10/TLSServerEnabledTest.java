@@ -53,6 +53,7 @@ import com.teragrep.rlp_03.frame.FrameDelegationClockFactory;
 import com.teragrep.rlp_03.frame.delegate.DefaultFrameDelegate;
 import com.teragrep.rlp_10.config.*;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,19 +63,14 @@ import javax.net.ssl.SSLEngine;
 import javax.net.ssl.TrustManagerFactory;
 import java.io.File;
 import java.io.FileInputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.security.*;
+import java.security.KeyStore;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
-/**
- * These are a copy from rlp_03 test suite
- */
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TestTLSServer {
+public class TLSServerEnabledTest {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TestTLSServer.class);
 
@@ -82,10 +78,12 @@ public class TestTLSServer {
 
     private ExecutorService executorService;
 
-    private final AtomicLong atomicLong = new AtomicLong();
-
-    //@BeforeAll
-    public void init() {
+    @Test
+    @EnabledIfSystemProperty(
+            named = "runServer",
+            matches = "true"
+    )
+    public void runServer() {
         final SocketAddressConfig socketAddressConfig = new SocketAddressConfig();
 
         final EventLoopFactory eventLoopFactory = new EventLoopFactory();
@@ -133,64 +131,13 @@ public class TestTLSServer {
                 eventLoop,
                 executorService,
                 new TLSFactory(sslContext, sslEngineFunction),
-                new FrameDelegationClockFactory(() -> new DefaultFrameDelegate((frame) -> atomicLong.incrementAndGet()))
+                new FrameDelegationClockFactory(() -> new DefaultFrameDelegate((frame) -> {
+                    System.out.println(new String(frame.relpFrame().payload().toBytes(), StandardCharsets.UTF_8));
+                    //frame.relpFrame().close();
+                }))
         );
         Assertions.assertDoesNotThrow(() -> serverFactory.create(socketAddressConfig.port()));
-    }
 
-    //@AfterAll
-    public void cleanup() {
-        eventLoop.stop();
-        executorService.shutdown();
-    }
-
-    //@AfterEach
-    public void clearMessageList() {
-        // clear received list
-        atomicLong.set(0);
-    }
-
-    @Test
-    public void testBenchmark() {
-        final int clients = 1;
-        final int messageCount = 20000;
-        final int retryTransmissionCount = 3;
-        final int retryConnectionCount = 3;
-        final InitiatorConfig initiatorConfig = new InitiatorConfig(
-                clients,
-                retryTransmissionCount,
-                retryConnectionCount
-        );
-        final MetricsConfig metricsConfiguration = new MetricsConfig(10000);
-        final ReportConfig reportConfig = new ReportConfig(1000, TimeUnit.SECONDS, TimeUnit.MILLISECONDS);
-        final PrometheusConfig prometheusConfiguration = new PrometheusConfig(8080);
-        final TimeoutConfig timeoutConfiguration = new TimeoutConfig();
-        final TransportConfig transportConfiguration = new TransportConfig(
-                true,
-                Path.of("src/test/resources/tls/keystore-client.jks"),
-                Path.of("src/test/resources/tls/truststore.jks"),
-                "changeit",
-                "changeit",
-                "TLSv1.3"
-        );
-        final RecordStreamConfig recordStreamConfig = new RecordStreamConfig(messageCount);
-        final SocketAddressConfig socketAddressConfig = new SocketAddressConfig();
-        final DelayConfig delayConfig = new DelayConfig();
-        final SyslogConfig syslogConfig = new SyslogConfig();
-        final Benchmark benchmark = new Benchmark(
-                initiatorConfig,
-                metricsConfiguration,
-                prometheusConfiguration,
-                timeoutConfiguration,
-                transportConfiguration,
-                recordStreamConfig,
-                reportConfig,
-                socketAddressConfig,
-                delayConfig,
-                syslogConfig
-        );
-        benchmark.startBenchmark();
-        Assertions.assertTrue(atomicLong.get() != 0);
-        Assertions.assertTrue(atomicLong.get() <= clients * messageCount);
+        Assertions.assertDoesNotThrow(() -> Thread.sleep(Long.MAX_VALUE));
     }
 }

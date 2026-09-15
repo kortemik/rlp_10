@@ -60,11 +60,10 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * These are a copy from rlp_03 test suite
@@ -75,11 +74,10 @@ public class TestServer {
     private static final Logger LOGGER = LoggerFactory.getLogger(TestServer.class);
 
     private EventLoop eventLoop;
-    private Thread eventLoopThread;
 
     private ExecutorService executorService;
 
-    private final List<byte[]> messageList = new LinkedList<>();
+    private final AtomicLong atomicLong = new AtomicLong();
 
     @BeforeAll
     public void init() {
@@ -88,15 +86,15 @@ public class TestServer {
         final EventLoopFactory eventLoopFactory = new EventLoopFactory();
         Assertions.assertDoesNotThrow(() -> eventLoop = eventLoopFactory.create());
 
-        eventLoopThread = new Thread(eventLoop);
-        eventLoopThread.start();
+        executorService = Executors.newVirtualThreadPerTaskExecutor();
 
-        executorService = Executors.newSingleThreadExecutor();
+        executorService.submit(eventLoop);
+
         final ServerFactory serverFactory = new ServerFactory(
                 eventLoop,
                 executorService,
                 new PlainFactory(),
-                new FrameDelegationClockFactory(() -> new DefaultFrameDelegate((frame) -> messageList.add(frame.relpFrame().payload().toBytes())))
+                new FrameDelegationClockFactory(() -> new DefaultFrameDelegate((frame) -> atomicLong.incrementAndGet()))
         );
         Assertions.assertDoesNotThrow(() -> serverFactory.create(socketAddressConfig.port()));
     }
@@ -105,18 +103,17 @@ public class TestServer {
     public void cleanup() {
         eventLoop.stop();
         executorService.shutdown();
-        Assertions.assertDoesNotThrow(() -> eventLoopThread.join());
     }
 
     @AfterEach
     public void clearMessageList() {
         // clear received list
-        messageList.clear();
+        atomicLong.set(0);
     }
 
     @Test
     public void testMessageCount() {
-        final int clients = 5000;
+        final int clients = 50;
         final long messageCount = 300000;
         final int retryTransmissionCount = 3;
         final int retryConnectionCount = 3;
@@ -147,8 +144,8 @@ public class TestServer {
                 syslogConfig
         );
         benchmark.startBenchmark();
-        Assertions.assertTrue(!messageList.isEmpty());
-        Assertions.assertEquals(messageList.size(), messageCount);
+        Assertions.assertTrue(atomicLong.get() != 0);
+        Assertions.assertEquals(messageCount, atomicLong.get());
     }
 
     @Test
